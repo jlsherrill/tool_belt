@@ -54,3 +54,7 @@ The release configuration file maintains information about the release including
       - 7423
       - 8265
       - 7815
+
+#### Koji Commands
+
+The koji subcommands are designed to generate tags for different buildroot and tagging configurations that Katello supports today. The commands can generate new nightly buildroots for a given operating system and support automating the creation of buildroots when a new version is being released. See `./tools.rb koji --help` for a list of sub commands and what each does.
