@@ -31,23 +31,26 @@ module ToolBelt
         commits = issue['changesets']
 
         commits.each do |commit|
-          if !commit['comments'].start_with?('Merge pull request') && !@release_environment.commit_in_repos?(repo_names, commit['comments'])
+          if !commit['comments'].start_with?('Merge pull request') && !@release_environment.commit_in_release_branch?(repo_names, commit['comments'])
             revisions << commit['revision']
           end
         end
 
-        picks << cherry_pick(issue, revisions) unless revisions.empty?
+        revisions.each do |revision|
+          picks << cherry_pick(issue, revision)
+        end
       end
 
       picks
     end
 
-    def cherry_pick(issue, revisions)
-      {
+    def cherry_pick(issue, revision)
+      pick = {
         'id' => issue['id'],
         'closed_on' => issue['closed_on'],
         'subject' => issue['subject'],
-        'revisions' => revisions
+        'revision' => revision,
+        'repository' => find_repository(revision)
       }
     end
 
@@ -63,9 +66,9 @@ module ToolBelt
 
       picks.each do |pick|
         if ignore?(pick['id'])
-          ignore_string << "#{pick['id']} - #{Time.parse(pick['closed_on'])}: #{pick['revisions']} #{pick['subject']}"
+          ignore_string << log_entry(pick)
         else
-          missing_string << "#{pick['id']} - #{Time.parse(pick['closed_on'])}: #{pick['revisions']} #{pick['subject']}"
+          missing_string << log_entry(pick)
         end
       end
 
@@ -74,6 +77,16 @@ module ToolBelt
       end
 
       puts "Cherry picks written to cherry_picks_#{release}"
+    end
+
+    def log_entry(pick)
+      "#{pick['id']} - #{Time.parse(pick['closed_on'])}: [#{pick['revision']}] [#{pick['repository']}] #{pick['subject']}"
+    end
+
+    def find_repository(revision)
+      @release_environment.repo_names.find do |repo_name|
+        @release_environment.commit_in_repo?(repo_name, revision)
+      end
     end
 
   end
