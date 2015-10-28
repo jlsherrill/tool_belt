@@ -21,6 +21,7 @@ module ToolBelt
       '2.1' => '1.7',
       '2.2' => '1.8',
       '2.3' => '1.9',
+      '2.4' => '1.10'
     }
 
     attr_reader :version, :systools
@@ -32,9 +33,10 @@ module ToolBelt
     end
 
     def build_katello_tags(os)
-      operating_systems = os.nil? ? SERVER_OSES : os
+      operating_systems = os.nil? ? CLIENT_OSES : os
 
       operating_systems.each do |os|
+        client_only = !SERVER_OSES.include?(os)
         puts "Building Katello tag for Katello #{@katello_version} on #{os}"
         puts "========================================================"
 
@@ -42,18 +44,19 @@ module ToolBelt
         # Tag cloning should only be done during initial tag creation for
         # a version and then not again unless done as a manual command outside
         # of this function
-        if execute("list-tags katello-#{@katello_version}-#{os}").first.empty?
+        found_tags = execute("list-tags katello-#{@katello_version}-#{os}").first
+        if found_tags.nil? || found_tags.empty?
           execute("clone-tag katello-nightly-#{os} katello-#{@katello_version}-#{os}")
-          execute("clone-tag katello-thirdparty-#{os} katello-#{@katello_version}-thirdparty-#{os}")
+          execute("clone-tag katello-thirdparty-#{os} katello-#{@katello_version}-thirdparty-#{os}") unless client_only
         end
 
         execute("add-tag katello-#{@katello_version}-#{os}-build  --arches=x86_64")
-        execute("add-tag katello-#{@katello_version}-#{os}-override")
-        execute("add-tag-inheritance katello-#{@katello_version}-#{os}-build katello-#{@katello_version}-#{os}-override")
-        execute("add-tag-inheritance katello-#{@katello_version}-#{os}-override katello-#{@katello_version}-#{os}")
-        execute("add-tag-inheritance katello-#{@katello_version}-#{os} katello-#{@katello_version}-thirdparty-#{os}")
-        execute("add-tag-inheritance katello-#{@katello_version}-#{os}-build foreman-plugins-#{@foreman_version}-#{os}-override --priority=2")
-        execute("add-tag-inheritance katello-#{@katello_version}-#{os}-build foreman-#{@foreman_version}-#{os} --priority=3")
+        execute("add-tag katello-#{@katello_version}-#{os}-override") unless client_only
+        execute("add-tag-inheritance katello-#{@katello_version}-#{os}-build katello-#{@katello_version}-#{os}-override") unless client_only
+        execute("add-tag-inheritance katello-#{@katello_version}-#{os}-override katello-#{@katello_version}-#{os}") unless client_only
+        execute("add-tag-inheritance katello-#{@katello_version}-#{os} katello-#{@katello_version}-thirdparty-#{os}") unless client_only
+        execute("add-tag-inheritance katello-#{@katello_version}-#{os}-build foreman-plugins-#{@foreman_version}-#{os}-override --priority=2") unless client_only
+        execute("add-tag-inheritance katello-#{@katello_version}-#{os}-build foreman-#{@foreman_version}-#{os} --priority=3") unless client_only
         execute("add-target katello-#{@katello_version}-#{os} katello-#{@katello_version}-#{os}-build")
 
         add_external_repos(os, "katello-#{@katello_version}-#{os}-build")
@@ -84,8 +87,7 @@ module ToolBelt
 
         execute("add-tag katello-#{version_prefix}client-#{os}")
         execute("add-tag katello-#{version_prefix}client-#{os}-build --arches=x86_64")
-        execute("add-tag-inheritance katello-#{version_prefix}client-#{os} katello-#{@katello_version}-#{os}")
-        execute("add-tag-inheritance katello-#{version_prefix}client-#{os} katello-#{version_prefix}thirdparty-pulp-#{os}")
+        execute("add-tag-inheritance katello-#{version_prefix}client-#{os} katello-#{@katello_version}-#{os} --priority=3")
         execute("add-tag-inheritance katello-#{version_prefix}client-#{os} katello-#{version_prefix}thirdparty-pulp-#{os} --priority=2")
         execute("add-target katello-#{version_prefix}client-#{os} katello-#{version_prefix}client-#{os}-build")
 
@@ -100,7 +102,8 @@ module ToolBelt
         puts "Building Pulp tag for Katello #{version} on #{os}"
         puts "========================================================"
 
-        if execute("list-tags katello-#{@katello_version}-thirdparty-pulp-#{os}").first.empty?
+        found_tags = execute("list-tags katello-#{@katello_version}-thirdparty-pulp-#{os}").first
+        if found_tags.nil? || found_tags.empty?
           execute("clone-tag katello-thirdparty-pulp-#{os} katello-#{@katello_version}-thirdparty-pulp-#{os}")
         end
 
@@ -120,13 +123,15 @@ module ToolBelt
         puts "Building Candlepin tag for Katello #{version} on #{os}"
         puts "========================================================"
 
-        if execute("list-tags katello-#{version_prefix}thirdparty-candlepin-#{os}").first.empty?
+        puts execute("list-tags katello-#{version_prefix}thirdparty-candlepin-#{os}").inspect
+        found_tags = execute("list-tags katello-#{version_prefix}thirdparty-candlepin-#{os}").first
+        if found_tags.nil? || found_tags.empty?
           execute("clone-tag katello-thirdparty-candlepin-#{os} katello-#{@katello_version}-thirdparty-candlepin-#{os}")
         end
 
         execute("add-tag katello-#{version_prefix}thirdparty-candlepin-#{os}-build --arches=x86_64")
         execute("add-tag katello-#{version_prefix}thirdparty-candlepin-#{os}-override")
-        execute("add-target katello-#{version_prefix}thirdparty-candlepin-#{os} katello-#{version_prefix}-thirdparty-candlepin-#{os}-build")
+        execute("add-target katello-#{version_prefix}thirdparty-candlepin-#{os} katello-#{version_prefix}thirdparty-candlepin-#{os}-build")
         add_external_repos(os, "katello-#{version_prefix}thirdparty-candlepin-#{os}-build")
         execute("regen-repo katello-#{version_prefix}thirdparty-candlepin-#{os}-build")
 

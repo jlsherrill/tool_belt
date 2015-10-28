@@ -29,7 +29,7 @@ module ToolBelt
       module KatelloVersionOption
         def self.included(base)
           base.send :option, "--katello-version", "KATELLO_VERSION", "Katello version to build client tags for" do |version|
-            versions = %w(nightly 2.1 2.2 2.3)
+            versions = %w(nightly 2.1 2.2 2.3 2.4)
             signal_usage_error "Version must be one of #{versions}" unless versions.include?(version)
             version
           end
